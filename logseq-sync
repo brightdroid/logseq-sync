@@ -1,0 +1,142 @@
+#!/bin/bash
+
+
+### usage
+function usage
+{
+    echo
+    echo "Usage: $(basename $0) [-h] [-l LOGSEQDIR] GRAPH... " >&2
+    echo >&2
+    echo -e "\t-l\tLogseq install directory" >&2
+    echo -e "\t-d\tDebug output" >&2
+    echo -e "\t-h\tThis help" >&2
+    echo >&2
+    echo -e "\tGRAPH...\tLogseq-Graph directories to sync" >&2
+
+    exit 1
+}
+
+
+### show error and exit with given code (when given)
+# $1: title
+# $2: message
+# $2: exit code
+function error
+{
+    notify "$1" "$2"
+
+    exit ${3:-1}
+}
+
+
+### send passive notification
+# $1: title
+# $2: message
+function notify
+{
+    img="${LOGSEQ}/resources/app/icon.png"
+    [ -e "${img}" ] && img="-i ${img}" || img=""
+
+    notify-send -a Logseq $img -a "Logseq" "$1" "$2"
+}
+
+
+### run command in repo and check return value
+# $1: working directory
+# $2: command and args
+# $3: exit param for error()
+function repo_cmd
+{
+    cd $1
+    out=$(eval $2 2>&1)
+    ret=$?
+
+    [ $DEBUG -eq 1 ] && echo "$(pwd): $2" >&2
+
+    if [ $ret -ne 0 ]
+    then
+        error "Repo $r" "$out" "$3"
+    fi
+}
+
+
+### try to find Logseq
+LOGSEQ=$(which Logseq 2>/dev/null)
+if [ -x "${LOGSEQ}" ]
+then
+    LOGSEQ=$(dirname $(readlink -f $LOGSEQ))
+fi
+
+
+### requirements installed?
+if ! which notify-send > /dev/null 2>&1
+then
+    error "Missing Requirements" "notify-send (libnotify-bin) not installed!" 1
+fi
+
+
+### parse params
+DEBUG=0
+while getopts "hdl:" o; do
+    case "${o}" in
+        d)
+            DEBUG=1
+            ;;
+        l)
+            LOGSEQ="${OPTARG}"
+            ;;
+        *)
+            usage
+            ;;
+    esac
+done
+shift $((OPTIND-1))
+
+
+### logseq path correct?
+if [ ! -x "${LOGSEQ}/Logseq" -o ! -f "${LOGSEQ}/resources/app/icon.png" ]
+then
+    error "Error" "Logseq not found! Use -l to specify path." 1
+fi
+
+
+### valid Repo directories?
+REPOS=()
+for d in $@; do
+    d_abs=$(readlink -f $d)
+    if [ -d "${d_abs}/.git" ]
+    then
+        REPOS+=($d_abs)
+    else
+        error "Repo ${d}" "Not a valid git repo or not found!" 2
+    fi
+done
+
+# no valid Repo found
+[ ${#REPOS[@]} -lt 1 ] && usage
+
+
+### update local tree before starting
+for r in ${REPOS[@]}
+do
+    repo_cmd "$r" 'git pull --no-rebase' 3
+done
+
+notify 'Pull successful'
+
+
+### run logseq
+${LOGSEQ}/Logseq
+
+
+### update remote repo
+for r in ${REPOS[@]}
+do
+    repo_cmd "$r" 'git add -A' 4
+    repo_cmd "$r" "echo 'Sync from $(hostname -s)' | git commit -F -" 4
+    repo_cmd "$r" 'git push' 4
+done
+
+
+### finish
+notify "Push successful"
