@@ -4,7 +4,7 @@ This script can automatically "sync" your Logseq-Graphs with git.
 
 ## Preparations
 
-  - Install/extract Logseq to e.g. `~/Apps/`
+  - Install/extract [Logseq](https://github.com/logseq/logseq) to e.g. `~/Apps/`
   - (optional) add symlink to Logseq in `~/bin/`:
     ```bash
     ln -st ~/bin ~/Apps/Logseq-linux-x64/Logseq
