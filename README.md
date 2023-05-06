@@ -1,5 +1,10 @@
 # Logseq Git-Sync
 
+> **Warning**
+>
+> **DEPRECATED**, see new universal [App-Sync](https://github.com/brightdroid/app-sync)
+
+
 This script can automatically "sync" your Logseq-Graphs with git.
 
 ## Preparations
